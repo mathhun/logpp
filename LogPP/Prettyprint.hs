@@ -1,34 +1,32 @@
-{-# LANGUAGE OverloadedStrings, DeriveGeneric #-}
-module LogPP.Prettyprint (
-    Parser(..)
-  , parseOnly
-  , pp
-  , ppT
-  , parseTime
-  , parseTable
-) where
+{-# LANGUAGE OverloadedStrings, DeriveGeneric, DeriveDataTypeable #-}
+module LogPP.Prettyprint where
 
 import Control.Applicative
-import Data.Aeson (FromJSON, decode)
---import Data.Attoparsec.Text
+import Control.Monad
+import Control.Monad.Trans
+import Data.Aeson
 import Data.Attoparsec.Text.Parsec
-import qualified Data.Attoparsec.ByteString as AB
-import Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding
-import GHC.Generics (Generic)
+import GHC.Generics
+
+--
+-- Data Types
+--
 
 data LogEntry = LogEntry
   { logTime  :: Text
   , logTable :: Text
   , logText  :: Text
-  , logBinding :: Maybe Binding
-  }
+  , logBinding :: Binding
+  } deriving (Eq, Show)
 
-data Binding = Binding { binding :: Map Text Text } deriving (Show, Generic )
+data Binding = Binding { bindin :: M.Map Text Text } deriving (Show, Generic, Eq)
 instance FromJSON Binding
+fromList :: [(Text,Text)] -> Binding
+fromList = Binding . M.fromList
 
 pp :: String -> String
 pp = undefined
@@ -36,29 +34,50 @@ pp = undefined
 ppT :: Text -> Text
 ppT = undefined
 
+--
+-- Parser
+--
+
 parseLog :: Parser LogEntry
 parseLog = do
   time <- parseTime
-  -- skip log level
   table <- parseTable
-  -- skip elapsed
-  (text, binding) <- parseSql
-  return $ LogEntry time table text binding
+  (text, b) <- parseSql
+  case b of
+    Right binding -> return $ LogEntry time table text binding
+    Left err -> error err
 
 parseTime :: Parser Text
-parseTime = takeTill (' ' ==)
+parseTime = takeTill (' ' ==) <* skipSpace
 
--- log0 = "2014-08-13T18:26:34+09:00 TRACE (8): [dm_common_master](0.00013) SELECT * FROM device WHERE id = :id  ; // bind=>{\":id\":\"sp\"}"
 parseTable :: Parser Text
 parseTable = string "TRACE (8): [" *> takeTill (']' ==) <* skipWhile (' ' /=)
 
-parseSql :: Parser (Text, Maybe Binding)
+parseSql :: Parser (Text, Either String Binding)
 parseSql = do
-  s <- takeTill (== ';')
+  s <- takeTill (== ';') <* (string ";" >> skipSpace)
   b <- parseBinding
-  return (s, b)
+  return (T.strip s, b)
 
-parseBinding :: Parser (Maybe Binding)
+parseBinding :: Parser (Either String Binding)
 parseBinding = do
+  string "// bind=>"
   t <- takeText
-  return $ decode $ encodeUtf8 t
+  case (eitherDecodeStrict $ encodeUtf8 t) of
+    Right decoded -> return $ Right $ Binding decoded
+    Left err -> return $ Left err
+
+{-
+Data.Aeson
+  decode :: Data.ByteString.Lazy.ByteString ->
+
+Data.Text.Encoding
+  encodeUtf8 :: Data.Text.Internal -> Data.ByteString.ByteString
+-}
+
+--
+-- Printer
+--
+
+showBinding :: Binding -> String
+showBinding = undefined
