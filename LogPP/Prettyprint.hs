@@ -23,7 +23,7 @@ data LogEntry = LogEntry
   , logBinding :: Binding
   } deriving (Eq, Show)
 
-data Binding = Binding { bindin :: M.Map Text Text } deriving (Show, Generic, Eq)
+data Binding = Binding { binding :: M.Map Text Text } deriving (Show, Generic, Eq)
 instance FromJSON Binding
 fromList :: [(Text,Text)] -> Binding
 fromList = Binding . M.fromList
@@ -79,5 +79,19 @@ Data.Text.Encoding
 -- Printer
 --
 
-showBinding :: Binding -> String
-showBinding = undefined
+showLogEntry :: LogEntry -> String
+showLogEntry e = time ++ " [" ++ tbl ++ "] " ++ sql
+  where
+    time = T.unpack $ logTime e
+    tbl  = T.unpack $ logTable e
+    sql  = T.unpack $ unbind (logText e) (binding $ logBinding e)
+
+unbind :: Text -> (M.Map Text Text) -> Text
+unbind t b = T.unwords $ map unbind1 $ T.words t
+  where
+    unbind1 w | T.isPrefixOf ":" w = replace1 (T.drop 1 w)
+              | otherwise = w
+    replace1 w = case M.lookup w b of
+                   Just t -> T.concat ["'", t, "'"]
+                   Nothing -> w
+
