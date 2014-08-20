@@ -23,6 +23,9 @@ p parser = parseOnly parser log0
 
 spec :: Spec
 spec = do
+  --
+  -- Parser
+  --
   describe "parseTime" $ do
     it "parses time" $
       p parseTime `shouldBe` Right "2014-08-13T18:26:34+09:00"
@@ -35,7 +38,9 @@ spec = do
   describe "parseLog" $ do
     it "parses a log entry" $
       parseOnly parseLog log0 `shouldBe` Right logEntry0
-
+  --
+  -- Printer
+  --
   describe "showLog" $ do
     it "shows a log entry" $
       showLogEntry logEntry0 `shouldBe` showLog0

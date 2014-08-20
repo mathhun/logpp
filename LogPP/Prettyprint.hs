@@ -11,6 +11,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding
 import GHC.Generics
+import System.Console.ANSI
 
 --
 -- Data Types
@@ -28,12 +29,6 @@ instance FromJSON Binding
 fromList :: [(Text,Text)] -> Binding
 fromList = Binding . M.fromList
 
-pp :: String -> String
-pp = undefined
-
-ppT :: Text -> Text
-ppT = undefined
-
 --
 -- Parser
 --
@@ -45,7 +40,7 @@ parseLog = do
   (text, b) <- parseSql
   case b of
     Right binding -> return $ LogEntry time table text binding
-    Left err -> error err
+    Left err -> error $ "parseLog: " ++ err
 
 parseTime :: Parser Text
 parseTime = takeTill (' ' ==) <* skipSpace
@@ -62,7 +57,7 @@ parseSql = do
 parseBinding :: Parser (Either String Binding)
 parseBinding = do
   string "// bind=>"
-  t <- takeText
+  t <- takeText <* skipSpace
   case (eitherDecodeStrict $ encodeUtf8 t) of
     Right decoded -> return $ Right $ Binding decoded
     Left err -> return $ Left err
@@ -84,6 +79,7 @@ showLogEntry e = time ++ " [" ++ tbl ++ "] " ++ sql
   where
     time = T.unpack $ logTime e
     tbl  = T.unpack $ logTable e
+    --sql  = color $ T.unpack $ unbind (logText e) (binding $ logBinding e)
     sql  = T.unpack $ unbind (logText e) (binding $ logBinding e)
 
 unbind :: Text -> (M.Map Text Text) -> Text
@@ -95,3 +91,22 @@ unbind t b = T.unwords $ map unbind1 $ T.words t
                    Just t -> T.concat ["'", t, "'"]
                    Nothing -> w
 
+color :: String -> String
+color = unwords . reverse . colorTable . reverse . words
+  where
+    colorTable (w:[]) = [w]
+    colorTable (w:ws:[]) = w : ws : []
+    colorTable (w1:w2:ws) | w2=="from" || w2=="FROM" = ("\x1b[32m"++w1++"\x1b[0m") : w2 : colorTable ws
+                          | otherwise                = w1 : colorTable (w2:ws)
+
+--
+-- Command line interface
+--
+
+pp :: String -> String
+pp = unlines . map prettyprint . T.lines . T.pack
+
+prettyprint :: Text -> String
+prettyprint t = case parseOnly parseLog t of
+                  Right e -> showLogEntry e
+                  Left err -> "*** ERROR: " ++ err
