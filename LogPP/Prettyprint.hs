@@ -60,7 +60,7 @@ parseBinding = do
   t <- takeText <* skipSpace
   case (eitherDecodeStrict $ encodeUtf8 t) of
     Right decoded -> return $ Right $ Binding decoded
-    Left err -> return $ Left err
+    Left err -> return $ Left ("parseBinding: " ++ err)
 
 {-
 Data.Aeson
@@ -79,7 +79,6 @@ showLogEntry e = time ++ " [" ++ tbl ++ "] " ++ sql
   where
     time = T.unpack $ logTime e
     tbl  = T.unpack $ logTable e
-    --sql  = color $ T.unpack $ unbind (logText e) (binding $ logBinding e)
     sql  = T.unpack $ unbind (logText e) (binding $ logBinding e)
 
 unbind :: Text -> (M.Map Text Text) -> Text
@@ -90,6 +89,10 @@ unbind t b = T.unwords $ map unbind1 $ T.words t
     replace1 w = case M.lookup w b of
                    Just t -> T.concat ["'", t, "'"]
                    Nothing -> w
+
+showLogEntryColor :: LogEntry -> String
+showLogEntryColor e = color e'
+  where e' = showLogEntry e
 
 color :: String -> String
 color = unwords . reverse . colorTable . reverse . words
@@ -108,5 +111,5 @@ pp = unlines . map prettyprint . T.lines . T.pack
 
 prettyprint :: Text -> String
 prettyprint t = case parseOnly parseLog t of
-                  Right e -> showLogEntry e
+                  Right e -> showLogEntryColor e
                   Left err -> "*** ERROR: " ++ err

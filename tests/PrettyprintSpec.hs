@@ -17,6 +17,7 @@ logEntry0 = LogEntry {
   , logBinding = fromList [("id","sp")]
 }
 showLog0 = "2014-08-13T18:26:34+09:00 [masterdb] SELECT * FROM device WHERE id = 'sp'"
+showLogColor0 = "2014-08-13T18:26:34+09:00 [masterdb] SELECT * FROM \x1b[32mdevice\x1b[0m WHERE id = 'sp'"
 
 p :: Parser Text -> Either String Text
 p parser = parseOnly parser log0
@@ -47,6 +48,9 @@ spec = do
   describe "unbind" $ do
     it "replaces placeholders in sql text" $
       unbind "where id = :id" (M.fromList [("id", "sp")]) `shouldBe` "where id = 'sp'"
+  describe "showLog color" $ do
+    it "shows a log entry in color" $
+      showLogEntryColor logEntry0 `shouldBe` showLogColor0
 
 main :: IO ()
 main = hspec spec
